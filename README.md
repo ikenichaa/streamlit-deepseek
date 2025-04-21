@@ -37,3 +37,19 @@ streamlit run app.py
 ```
 uvicorn fast-api:app --reload
 ```
+
+# Deepseek local
+
+1. Run the two apps from Docker Compose:
+
+```sh
+docker compose up -d
+```
+
+2. Install the Deepseek models: (This might take a few minutes)
+
+```sh
+docker compose exec ollama ollama pull deepseek-r1:7b
+```
+
+3. Run the website on http://localhost:3001
