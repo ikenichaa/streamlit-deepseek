@@ -36,54 +36,92 @@ def get_messages():
 
 st.session_state.messages = get_messages()
 
-def ask_llm(prompt):
-    print("hello---")
+# Initialize session state
+if "generating_response" not in st.session_state:
+    st.session_state.generating_response = False
+if "stop_generation" not in st.session_state:
+    st.session_state.stop_generation = False
+if "full_response" not in st.session_state:
+    st.session_state.full_response = ""
+
+def stop_generation():
+    st.session_state.stop_generation = True
+    st.session_state.generating_response = False
+    st.session_state.messages.append({"role": "assistant", "content": st.session_state.full_response})
+    st.chat_message("assistant").markdown(st.session_state.full_response)
+    st.rerun()
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+
+def call_llm(prompt: str):
     # The API endpoint
-    url = "http://localhost:11434/api/generate"
+    url = "http://127.0.0.1:8000/stream-chat"
 
     # Data to be sent
     data = {
-        "model": "deepseek-r1:7b",
-        "prompt": str(prompt),
-        "stream": True
+        "prompt": str(prompt)
     }
 
     try:
         response = requests.post(url, json=data, stream=True)
         response.raise_for_status()  # Raise HTTP errors
 
-        full_response = ""
         for line in response.iter_lines():
-            if line:
-                chunk = json.loads(line.decode('utf-8'))
+            line_str = line.decode('utf-8').strip()
+            if line_str.startswith('data: '):
+                line_str = line_str[6:]
+
+            try:
+                chunk = json.loads(line_str)
                 if "response" in chunk:
-                    full_response += chunk["response"]
-                print("Chunk:", chunk)  # Debug streaming
-
-        return {"response": full_response}
-
+                    yield chunk["response"]
+                    print("Chunk:", chunk)  # Debug streaming
+            except json.JSONDecodeError:
+                    continue
+    
     except requests.exceptions.RequestException as e:
-        print(f"API Error: {e}")
-        return {"error": str(e)}
-    except json.JSONDecodeError as e:
-        print(f"JSON Error: {e}")
-        return {"error": "Invalid API response"}
+        print(f"error: {e}")
 
-
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
 
 if prompt := st.chat_input(
         "Ask questions and attach csv files",
         accept_file=True,
         file_type=["csv"],
     ):
-    st.chat_message("user").markdown(prompt)
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    response = ask_llm(prompt)
 
+    st.session_state.generating_response = True
+
+
+    # Extract text and files
+    text_prompt = prompt.text
+    file_prompt = prompt.files
+
+    st.chat_message("user").markdown(text_prompt)
+    st.session_state.messages.append({"role": "user", "content": text_prompt})
+    if st.session_state.generating_response and st.button("⏹️ Stop Generation", key="stop", on_click=stop_generation):
+        pass
+
+    print(f"----> Prompt: {text_prompt}")
+    print(f"----> Generating response: {st.session_state.generating_response}")
+
+    # Prepare assistant response
     with st.chat_message("assistant"):
-        st.markdown(response)
+        response_placeholder = st.empty()  # Create a placeholder
+        st.session_state.full_response = ""
+        
+        # Stream the response word-by-word
+        for word_chunk in call_llm(text_prompt):
+            st.session_state.full_response += word_chunk
+            response_placeholder.markdown(st.session_state.full_response + "▌")  # Typing effect
+        
+        # Final render (without cursor)
+        response_placeholder.markdown(st.session_state.full_response)
 
-    st.session_state.messages.append({"role": "assistant", "content": response})
+        # Save to session state
+        st.session_state.messages.append({"role": "assistant", "content": st.session_state.full_response})
+    
+    st.session_state.generating_response = False
+        
