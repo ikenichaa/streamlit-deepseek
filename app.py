@@ -27,33 +27,33 @@ top_k = st.sidebar.slider(
 st.title("Echo Bot")
 
 
-@st.cache_resource
-def get_messages():
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    return st.session_state.messages
+# @st.cache_resource
+# def get_messages():
+#     if "messages" not in st.session_state:
+#         st.session_state.messages = []
+#     return st.session_state.messages
 
 
-st.session_state.messages = get_messages()
+# st.session_state.messages = get_messages()
 
-# Initialize session state
-if "generating_response" not in st.session_state:
-    st.session_state.generating_response = False
-if "stop_generation" not in st.session_state:
-    st.session_state.stop_generation = False
-if "full_response" not in st.session_state:
-    st.session_state.full_response = ""
+# # Initialize session state
+# if "generating_response" not in st.session_state:
+#     st.session_state.generating_response = False
+# if "stop_generation" not in st.session_state:
+#     st.session_state.stop_generation = False
+# if "full_response" not in st.session_state:
+#     st.session_state.full_response = ""
 
-def stop_generation():
-    st.session_state.stop_generation = True
-    st.session_state.generating_response = False
-    st.session_state.messages.append({"role": "assistant", "content": st.session_state.full_response})
-    st.chat_message("assistant").markdown(st.session_state.full_response)
-    st.rerun()
+# def stop_generation():
+#     st.session_state.stop_generation = True
+#     st.session_state.generating_response = False
+#     st.session_state.messages.append({"role": "assistant", "content": st.session_state.full_response})
+#     st.chat_message("assistant").markdown(st.session_state.full_response)
+#     st.rerun()
 
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# for message in st.session_state.messages:
+#     with st.chat_message(message["role"]):
+#         st.markdown(message["content"])
 
 
 def call_llm(prompt: str):
@@ -86,42 +86,110 @@ def call_llm(prompt: str):
         print(f"error: {e}")
 
 
-if prompt := st.chat_input(
-        "Ask questions and attach csv files",
-        accept_file=True,
-        file_type=["csv"],
-    ):
+# if prompt := st.chat_input(
+#         "Ask questions and attach csv files",
+#         accept_file=True,
+#         file_type=["csv"],
+#     ):
 
+#     st.session_state.generating_response = True
+
+
+#     # Extract text and files
+#     text_prompt = prompt.text
+#     file_prompt = prompt.files
+
+#     st.chat_message("user").markdown(text_prompt)
+#     st.session_state.messages.append({"role": "user", "content": text_prompt})
+#     if st.session_state.generating_response and st.button("⏹️ Stop Generation", key="stop", on_click=stop_generation):
+#         pass
+
+#     print(f"----> Prompt: {text_prompt}")
+#     print(f"----> Generating response: {st.session_state.generating_response}")
+
+#     # Prepare assistant response
+#     with st.chat_message("assistant"):
+#         response_placeholder = st.empty()  # Create a placeholder
+#         st.session_state.full_response = ""
+        
+#         # Stream the response word-by-word
+#         for word_chunk in call_llm(text_prompt):
+#             st.session_state.full_response += word_chunk
+#             response_placeholder.markdown(st.session_state.full_response + "▌")  # Typing effect
+        
+#         # Final render (without cursor)
+#         response_placeholder.markdown(st.session_state.full_response)
+
+#         # Save to session state
+#         st.session_state.messages.append({"role": "assistant", "content": st.session_state.full_response})
+    
+#     st.session_state.generating_response = False
+
+# Initialize session state
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "generating_response" not in st.session_state:
+    st.session_state.generating_response = False
+if "full_response" not in st.session_state:
+    st.session_state.full_response = ""
+
+@st.cache_resource
+def get_messages():
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    return st.session_state.messages
+
+def stop_generation():
+    st.session_state.stop_generation = True
+    st.session_state.generating_response = False
+    st.session_state.messages.append({"role": "assistant", "content": st.session_state.full_response})
+    st.chat_message("assistant").markdown(st.session_state.full_response)
+    st.rerun()
+
+
+st.session_state.messages = get_messages()
+
+# Display all existing messages first
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# Show stop button ONLY during active generation
+# if st.session_state.generating_response:
+#     if st.button("⏹️ Stop Generation", key="stop"):
+#         print("----- here")
+#         pass
+
+# Process new user input
+if prompt := st.chat_input("Ask questions..."):
+    # Reset for new generation
+    st.session_state.full_response = ""
+    
+    # Store user message
+    st.chat_message("user").markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
     st.session_state.generating_response = True
-
-
-    # Extract text and files
-    text_prompt = prompt.text
-    file_prompt = prompt.files
-
-    st.chat_message("user").markdown(text_prompt)
-    st.session_state.messages.append({"role": "user", "content": text_prompt})
-    if st.session_state.generating_response and st.button("⏹️ Stop Generation", key="stop", on_click=stop_generation):
+    if st.button("⏹️ Stop Generation", key="stop", on_click=stop_generation):
         pass
 
-    print(f"----> Prompt: {text_prompt}")
-    print(f"----> Generating response: {st.session_state.generating_response}")
-
-    # Prepare assistant response
+    # Generate assistant response
     with st.chat_message("assistant"):
-        response_placeholder = st.empty()  # Create a placeholder
-        st.session_state.full_response = ""
+        response_placeholder = st.empty()
         
-        # Stream the response word-by-word
-        for word_chunk in call_llm(text_prompt):
-            st.session_state.full_response += word_chunk
-            response_placeholder.markdown(st.session_state.full_response + "▌")  # Typing effect
+        for chunk in call_llm(prompt):  # Your generator function
+            if not st.session_state.generating_response:
+                break
+                
+            st.session_state.full_response += chunk
+            response_placeholder.markdown(st.session_state.full_response + "▌")
         
-        # Final render (without cursor)
+        # Finalize response
         response_placeholder.markdown(st.session_state.full_response)
-
-        # Save to session state
-        st.session_state.messages.append({"role": "assistant", "content": st.session_state.full_response})
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": st.session_state.full_response
+        })
+        st.session_state.generating_response = False  # Generation complete
     
-    st.session_state.generating_response = False
-        
+    # Rerun to remove the button
+    st.rerun()
