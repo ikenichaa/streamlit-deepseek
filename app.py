@@ -5,26 +5,26 @@ import json
 # Slider
 temp = st.sidebar.slider(
     'Temperature',
-    0, 100,
+    0.0, 2.0, 0.7,
     label_visibility="visible",
-    help="Adjust higher temperature for more creativity"
+    help="Temperature sampling flattens or sharpens the probability distribution over the tokens to be sampled"
 )
 
 top_p = st.sidebar.slider(
     'Top P',
-    0, 100, 20,
+    0.0, 1.0, 0.9,
     label_visibility="visible",
-    help="Adjust higher temperature for more creativity"
+    help="Top-p sampling samples tokens with the highest probability scores until the sum of the scores reaches the specified threshold value"
 )
 
 top_k = st.sidebar.slider(
     'Top K',
-    0, 100,
+    0, 100, 40,
     label_visibility="visible",
-    help="Adjust higher temperature for more creativity"
+    help="Top-k sampling samples tokens with the highest probabilities until the specified number of tokens is reached."
 )
 
-st.title("Echo Bot")
+st.title("Deep Seek")
 
 def call_llm(prompt: str):
     # The API endpoint
@@ -92,7 +92,7 @@ if prompt := st.chat_input("Ask questions...", accept_file=True, file_type=["csv
     file_input = prompt.files
     
     # Store user message
-    st.chat_message("user").markdown(prompt)
+    st.chat_message("user").markdown(text_input)
     st.session_state.messages.append({"role": "user", "content": text_input})
     st.session_state.generating_response = True
     if st.button("⏹️ Stop Generation", key="stop", on_click=stop_generation):
@@ -101,14 +101,23 @@ if prompt := st.chat_input("Ask questions...", accept_file=True, file_type=["csv
     # Generate assistant response
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
+
+        # Phase 1: Show spinner until first chunk arrives
+        with st.spinner("Generating response..."):
+            llm_stream = call_llm(text_input)  # Get generator
+            first_chunk = next(llm_stream)  # Force first chunk
+            
+            st.session_state.full_response += first_chunk
+            response_placeholder.markdown(first_chunk + "▌")
         
-        for chunk in call_llm(text_input):  # Your generator function
+        # Phase 2: Stream remaining chunks
+        for chunk in llm_stream:
             if not st.session_state.generating_response:
                 break
                 
             st.session_state.full_response += chunk
             response_placeholder.markdown(st.session_state.full_response + "▌")
-        
+            
         # Finalize response
         response_placeholder.markdown(st.session_state.full_response)
         st.session_state.messages.append({
