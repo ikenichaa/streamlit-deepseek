@@ -3,16 +3,16 @@ import requests
 import json
 
 # Slider
-temp = st.sidebar.slider(
+temperature = st.sidebar.slider(
     'Temperature',
-    0.0, 2.0, 0.7,
+    0.0, 2.0, 0.6,
     label_visibility="visible",
     help="Temperature sampling flattens or sharpens the probability distribution over the tokens to be sampled"
 )
 
 top_p = st.sidebar.slider(
     'Top P',
-    0.0, 1.0, 0.9,
+    0.0, 1.0, 0.95,
     label_visibility="visible",
     help="Top-p sampling samples tokens with the highest probability scores until the sum of the scores reaches the specified threshold value"
 )
@@ -26,13 +26,19 @@ top_k = st.sidebar.slider(
 
 st.title("Deep Seek")
 
-def call_llm(prompt: str):
+def call_llm(prompt: str, option):
+    print("Option---->", option)
     # The API endpoint
     url = "http://127.0.0.1:8000/stream-chat"
 
     # Data to be sent
     data = {
-        "prompt": str(prompt)
+        "prompt": str(prompt),
+        "option": {
+            "temperature": option["temperature"],
+            "top_p": option["top_p"],
+            "top_k": option["top_k"]
+        }
     }
 
     try:
@@ -100,29 +106,56 @@ if prompt := st.chat_input("Ask questions...", accept_file=True, file_type=["csv
 
     # Generate assistant response
     with st.chat_message("assistant"):
-        response_placeholder = st.empty()
+        tab_think, tab_answer = st.tabs(["Thinking", "Answer"])
+        think_placeholder = st.empty()
+        answer_placeholder = st.empty()
+
+        think_response = ""
+        answer_response = ""
 
         # Phase 1: Show spinner until first chunk arrives
         with st.spinner("Generating response..."):
-            llm_stream = call_llm(text_input)  # Get generator
+            llm_stream = call_llm(
+                            text_input, 
+                            option={
+                                "temperature": temperature,
+                                "top_p": top_p,
+                                "top_k": top_k
+                            }
+                        )
             first_chunk = next(llm_stream)  # Force first chunk
-            
-            st.session_state.full_response += first_chunk
-            response_placeholder.markdown(first_chunk + "▌")
+            if first_chunk != "<think>":
+                st.session_state.full_response += first_chunk
+                # think_placeholder.markdown(first_chunk + "▌")
         
         # Phase 2: Stream remaining chunks
+        finish_thinking = False
         for chunk in llm_stream:
             if not st.session_state.generating_response:
                 break
-                
-            st.session_state.full_response += chunk
-            response_placeholder.markdown(st.session_state.full_response + "▌")
+
+            if chunk == "</think>":
+                finish_thinking = True
+                continue
+
+            if finish_thinking:
+                answer_response += chunk
+            else:
+                think_response += chunk
+
+            with tab_think:
+               think_placeholder.markdown(think_response) 
+            
+            with tab_answer:
+               answer_placeholder.markdown(answer_response) 
+            # st.session_state.full_response += chunk
+            # think_placeholder.markdown(st.session_state.full_response + "▌")
             
         # Finalize response
-        response_placeholder.markdown(st.session_state.full_response)
+        think_placeholder.markdown(st.session_state.full_response)
         st.session_state.messages.append({
             "role": "assistant",
-            "content": st.session_state.full_response
+            "content": answer_response
         })
 
         st.session_state.generating_response = False  # Generation complete
