@@ -24,10 +24,10 @@ top_k = st.sidebar.slider(
     help="Top-k sampling samples tokens with the highest probabilities until the specified number of tokens is reached."
 )
 
-st.title("Deep Seek")
+st.title("💬 Deep Seek")
+st.caption("You can ask questions and upload the file here")
 
 def call_llm(prompt: str, option):
-    print("Option---->", option)
     # The API endpoint
     url = "http://127.0.0.1:8000/stream-chat"
 
@@ -106,7 +106,6 @@ if prompt := st.chat_input("Ask questions...", accept_file=True, file_type=["csv
 
     # Generate assistant response
     with st.chat_message("assistant"):
-        tab_think, tab_answer = st.tabs(["Thinking", "Answer"])
         think_placeholder = st.empty()
         answer_placeholder = st.empty()
 
@@ -126,7 +125,6 @@ if prompt := st.chat_input("Ask questions...", accept_file=True, file_type=["csv
             first_chunk = next(llm_stream)  # Force first chunk
             if first_chunk != "<think>":
                 st.session_state.full_response += first_chunk
-                # think_placeholder.markdown(first_chunk + "▌")
         
         # Phase 2: Stream remaining chunks
         finish_thinking = False
@@ -142,14 +140,13 @@ if prompt := st.chat_input("Ask questions...", accept_file=True, file_type=["csv
                 answer_response += chunk
             else:
                 think_response += chunk
-
-            with tab_think:
-               think_placeholder.markdown(think_response) 
             
-            with tab_answer:
-               answer_placeholder.markdown(answer_response) 
-            # st.session_state.full_response += chunk
-            # think_placeholder.markdown(st.session_state.full_response + "▌")
+            with think_placeholder:
+                if think_response != "":
+                    print("think response--->", think_response)
+                    st.info(think_response, icon="🤔")
+
+            answer_placeholder.markdown(answer_response) 
             
         # Finalize response
         think_placeholder.markdown(st.session_state.full_response)
@@ -160,6 +157,4 @@ if prompt := st.chat_input("Ask questions...", accept_file=True, file_type=["csv
 
         st.session_state.generating_response = False  # Generation complete
     
-    # Rerun to remove the stop button
-    # when the response is done
     st.rerun()
